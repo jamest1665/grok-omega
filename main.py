@@ -32,7 +32,7 @@ class GrokOmega:
             resp = await client.post(
                 "https://api.x.ai/v1/chat/completions",
                 json={
-                    "model": "grok-beta",
+                    "model": "model": "grok-3",
                     "messages": messages,
                     "temperature": 0.7,
                     "max_tokens": 2048
