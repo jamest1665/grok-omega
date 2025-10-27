@@ -28,7 +28,17 @@ if st.button("Launch Ω Research", type="primary"):
             }
             
             try:
-                resp = httpx.get(google_url, headers=headers, timeout=10)
+                                # Use free proxy to bypass Google block on Streamlit
+                proxy_url = "http://154.202.121.20:3128"  # Free public proxy
+                proxies = {
+                    "http://": proxy_url,
+                    "https://": proxy_url,
+                }
+                try:
+                    resp = httpx.get(google_url, headers=headers, timeout=15, proxies=proxies)
+                except:
+                    # Fallback: try without proxy
+                    resp = httpx.get(google_url, headers=headers, timeout=10)
                 if resp.status_code == 200:
                     text = resp.text
                     # Extract X links
