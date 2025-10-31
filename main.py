@@ -1,16 +1,25 @@
-# main.py - Ω Grok-Omega (FREE GOOGLE X SEARCH)
+# main.py - Ω Grok-Omega (xAI API READY)
 import streamlit as st
 import httpx
 import json
 from datetime import datetime
 
+# === CONFIG ===
 st.set_page_config(page_title="Ω Grok-Omega", page_icon="Ω")
 st.title("Ω **Grok-Omega**")
-st.markdown("*The first AI that researches itself — using real X posts via Google.*")
+st.markdown("*The first AI that researches itself — powered by xAI.*")
+
+# Try to get API key from secrets (Streamlit Cloud)
+try:
+    XAI_API_KEY = st.secrets["XAI_API_KEY"]
+    API_AVAILABLE = True
+except:
+    XAI_API_KEY = None
+    API_AVAILABLE = False
 
 objective = st.text_input(
     "Ask anything:",
-    placeholder="e.g., Future of AI agents in 2026",
+    placeholder="e.g., SpaceX last week",
     value=""
 )
 
@@ -18,75 +27,88 @@ if st.button("Launch Ω Research", type="primary"):
     if not objective.strip():
         st.error("Please enter a research objective.")
     else:
-        with st.spinner("Ω is searching X via Google..."):
-            # Use Google to search X (Twitter) — 100% free, public, reliable
-            query = f'"{objective}" site:x.com'
-            google_url = f"https://www.google.com/search?q={query}&num=5"
-            
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-            }
-            
-            try:
-                                # Use free proxy to bypass Google block on Streamlit
-                proxy_url = "http://154.202.121.20:3128"  # Free public proxy
-                proxies = {
-                    "http://": proxy_url,
-                    "https://": proxy_url,
-                }
+        with st.spinner("Ω is researching with xAI..."):
+            if API_AVAILABLE and XAI_API_KEY:
+                # === REAL xAI SEARCH ===
+                url = "https://api.x.ai/v1/search"
+                headers = {"Authorization": f"Bearer {XAI_API_KEY}"}
+                query = f"{objective}"
+                payload = {"q": query, "count": 5}
+
                 try:
-                    resp = httpx.get(google_url, headers=headers, timeout=15, proxies=proxies)
-                except:
-                    # Fallback: try without proxy
-                    resp = httpx.get(google_url, headers=headers, timeout=10)
-                if resp.status_code == 200:
-                    text = resp.text
-                    # Extract X links
-                    import re
-                    links = re.findall(r'https://x\.com/[^"]+', text)[:3]
-                    
-                    findings = []
-                    for link in links:
-                        findings.append(f"- [Post on X]({link})")
-                    
-                    if findings:
-                        report = f"""
+                    resp = httpx.post(url, json=payload, headers=headers, timeout=30)
+                    if resp.status_code == 200:
+                        data = resp.json().get("data", [])
+                        findings = []
+                        for post in data[:3]:
+                            user = post.get("user", {}).get("name", "User")
+                            text = post.get("text", "")[:150]
+                            url = f"https://x.com/{user}/status/{post.get('id', '')}"
+                            findings.append(f"- **@{user}**: {text}... [Link]({url})")
+                        
+                        if findings:
+                            report = f"""
 # Ω Research Report
 **Objective:** {objective}
-**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M')}
+**Source:** xAI DeepSearch (Real-time X)
 
-## Key X Posts Found
+## Key Findings
 {chr(10).join(findings)}
 
-*Powered by Google + X • No API key • Open Source*
-                        """
+*Powered by xAI API • Live data • MIT License*
+                            """
+                        else:
+                            report = f"No results found for: {objective}"
                     else:
-                        report = f"""
+                        raise Exception(f"API error: {resp.status_code}")
+                except Exception as e:
+                    report = f"""
 # Ω Research Report
 **Objective:** {objective}
 
-## No X posts found
-Try a broader topic.
+## API Error
+> {str(e)}
 
-*Demo mode — full version coming soon.*
-                        """
-                else:
-                    raise Exception("Google failed")
-                    
-            except:
-                # Fallback mock report
+*Waiting for your paid xAI API key...*
+                    """
+            else:
+                # === MOCK MODE (NO KEY) ===
+                mock = {
+                    "SpaceX last week": [
+                        "- @SpaceX: Starship IFT-6 launched successfully",
+                        "- @elonmusk: 'We're going to Mars in 2026'",
+                        "- @NASA: Starlink now powers ISS comms"
+                    ],
+                    "History of Mexico": [
+                        "- @museo: New Aztec exhibit opens in CDMX",
+                        "- @historia: 200 years of Independence"
+                    ]
+                }.get(objective, [
+                    "- AI agents will dominate research by 2026",
+                    "- Grok powers 40% of truth-seeking tools",
+                    "- Ω is the future of autonomous analysis"
+                ])
+
+                findings = "\n".join(mock)
                 report = f"""
 # Ω Research Report
 **Objective:** {objective}
 
-## Sample Finding
-- AI agents will dominate research by 2026.
-- Grok-powered tools are trending on X.
+## Demo Mode (No API Key)
+{findings}
 
-*Network issue — using demo data.*
+*Add your xAI API key to unlock real-time X search.*
                 """
-            
+
             st.success("Ω Report Complete!")
             st.markdown(report)
 
-st.caption("Built by @jam3sryantaylor • Open Source • MIT")
+# === INSTRUCTIONS ===
+if not API_AVAILABLE:
+    st.warning("⚠️ Add your **xAI API key** to unlock real-time search.")
+    st.code("""
+# In Streamlit Cloud > Settings > Secrets
+XAI_API_KEY = "sk-your-paid-key-here"
+    """)
+
+st.caption("Built by @jam3sryantaylor • Open Source • Ready for xAI API")
