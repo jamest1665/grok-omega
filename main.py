@@ -1,4 +1,4 @@
-# main.py - Ω Grok-Omega Global v3.1 — Fixed Key Validation + 150 Languages + Voice + Grok 4.1 Fast
+# main.py - Ω Grok-Omega Global v3.2 — Fixed Key Validation + 150 Languages + Voice + Grok 4.1 Fast
 import streamlit as st
 import httpx
 from datetime import datetime
@@ -32,17 +32,17 @@ LANGUAGES = {
 selected_lang = st.selectbox("Language", options=list(LANGUAGES.keys()), index=0)
 lang_code = LANGUAGES[selected_lang]
 
-# === LOAD & VALIDATE XAI KEY (Fixed — No Prefix Check) ===
+# === LOAD & VALIDATE XAI KEY (Fixed — Simple Length Check Only) ===
 try:
     XAI_API_KEY = st.secrets["XAI_API_KEY"]
-    # Simple validation: Check length/format (sk-proj- or xai- style, 40+ chars)
-    if len(XAI_API_KEY) < 40 or not (XAI_API_KEY.startswith("sk-") or XAI_API_KEY.startswith("xai-")):
-        st.error("Invalid key format! Regenerate at https://console.x.ai (should be ~50 chars starting with 'sk-' or 'xai-').")
+    # Fixed validation: Only check length (40+ chars) — no prefix assumption
+    if len(XAI_API_KEY.strip()) < 40:
+        st.error("Invalid key length! Regenerate at https://console.x.ai (should be ~50 chars).")
         st.stop()
     API_READY = True
     st.success("✅ xAI Key Validated!")
-except:
-    st.error("Add your real key in Secrets: XAI_API_KEY = \"sk-your-key-here\" (no spaces).")
+except Exception as e:
+    st.error(f"Secrets error: {e}. Add XAI_API_KEY = \"sk-your-key-here\" in Settings > Secrets.")
     st.stop()
 
 # === VOICE INPUT (All Languages) ===
@@ -76,11 +76,11 @@ if st.button("Launch Ω Research", type="primary"):
     else:
         with st.spinner(f"Researching with Grok 4.1 Fast..."):
             try:
-                # REAL xAI CALL (Fixed Headers + Error Handling)
+                # REAL xAI CALL (Fixed Headers + Full Error Handling)
                 response = httpx.post(
                     "https://api.x.ai/v1/chat/completions",
                     headers={
-                        "Authorization": f"Bearer {XAI_API_KEY}",
+                        "Authorization": f"Bearer {XAI_API_KEY.strip()}",  # Strip any whitespace
                         "Content-Type": "application/json"
                     },
                     json={
@@ -107,17 +107,17 @@ if st.button("Launch Ω Research", type="primary"):
                     st.success("Report Complete!")
                     st.markdown(report)
                 else:
-                    # Detailed Error
-                    error_detail = response.text if response.text else "Unknown error"
+                    # Detailed Error Handling
+                    error_detail = response.text if response.text else "Unknown server error"
                     st.error(f"API Error {response.status_code}: {error_detail}")
                     if response.status_code == 400:
-                        st.info("400 = Invalid key. Check Secrets format: XAI_API_KEY = \"sk-your-key\" (no spaces).")
+                        st.info("400 = Invalid request. Check key in Secrets (no spaces). Regenerate at console.x.ai if needed.")
                     elif response.status_code == 403:
                         st.info("403 = No credits. Add $5 at https://console.x.ai/billing.")
                     elif response.status_code == 429:
                         st.info("429 = Rate limit. Wait 1 min or upgrade plan.")
             except httpx.TimeoutException:
-                st.error("Timeout — Try shorter query or check internet.")
+                st.error("Timeout — Try a shorter query or check internet.")
             except Exception as e:
                 st.error(f"Connection failed: {str(e)}")
 
@@ -134,4 +134,4 @@ if st.button("Launch Ω Research", type="primary"):
                     </script>
                     """, height=0)
 
-st.caption("Ω Grok-Omega Global v3.1 • 150+ Languages • Grok 4.1 Fast • MIT License")
+st.caption("Ω Grok-Omega Global v3.2 • 150+ Languages • Grok 4.1 Fast • MIT License")
