@@ -1,7 +1,8 @@
-# main.py - Ω Grok-Omega Global v3.3 — 400 Fixed + 150 Languages + Voice + Grok-beta
+# main.py - Ω Grok-Omega Global v3.4 — 400 Fixed + 150 Languages + Voice + Grok-beta
 import streamlit as st
 import httpx
 from datetime import datetime
+import time  # For retry delay
 
 # === CONFIG ===
 st.set_page_config(page_title="Ω Grok-Omega Global", page_icon="Ω", layout="centered")
@@ -32,15 +33,15 @@ LANGUAGES = {
 selected_lang = st.selectbox("Language", options=list(LANGUAGES.keys()), index=0)
 lang_code = LANGUAGES[selected_lang]
 
-# === LOAD & VALIDATE XAI KEY (Fixed — Length Only, No Prefix) ===
+# === LOAD & VALIDATE XAI KEY (Fixed — "sk-" Prefix + Length) ===
 try:
     XAI_API_KEY = st.secrets["XAI_API_KEY"].strip()  # Strip whitespace
-    # Minimal validation: Length only (xAI keys ~50 chars)
-    if len(XAI_API_KEY) < 40:
-        st.error("Key too short! Regenerate at https://console.x.ai (should be ~50 chars).")
+    # Fixed validation: "sk-" prefix + length 40+ chars (matches xAI's sk-proj- format)
+    if not XAI_API_KEY.startswith("sk-") or len(XAI_API_KEY) < 40:
+        st.error("Invalid key! xAI keys start with 'sk-proj-' and are ~50 chars. Regenerate at https://console.x.ai.")
         st.stop()
     API_READY = True
-    st.success("✅ xAI Key Loaded!")
+    st.success("✅ xAI Key Validated!")
 except Exception as e:
     st.error(f"Secrets error: {e}. Add XAI_API_KEY = \"sk-your-key-here\" (no spaces) in Settings > Secrets.")
     st.stop()
@@ -74,25 +75,27 @@ if st.button("Launch Ω Research", type="primary"):
         st.error("Please speak or type a question.")
     else:
         with st.spinner("Researching with Grok-beta..."):
-            try:
-                # REAL xAI CALL (Fixed Payload Types + Headers)
-                response = httpx.post(
-                    "https://api.x.ai/v1/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {XAI_API_KEY}",
-                        "Content-Type": "application/json"
-                    },
-                    json={
-                        "model": "grok-beta",  # Stable model (no 400 from invalid model)
-                        "messages": [{"role": "user", "content": objective}],
-                        "temperature": 0.7,  # Explicit float
-                        "max_tokens": 2048  # Explicit int
-                    },
-                    timeout=60
-                )
-                if response.status_code == 200:
-                    answer = response.json()["choices"][0]["message"]["content"]
-                    report = f"""
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    # REAL xAI CALL (Fixed Payload + Retry)
+                    response = httpx.post(
+                        "https://api.x.ai/v1/chat/completions",
+                        headers={
+                            "Authorization": f"Bearer {XAI_API_KEY}",
+                            "Content-Type": "application/json"
+                        },
+                        json={
+                            "model": "grok-beta",  # Stable model
+                            "messages": [{"role": "user", "content": objective}],
+                            "temperature": 0.7,  # Explicit float
+                            "max_tokens": 2048  # Explicit int
+                        },
+                        timeout=60
+                    )
+                    if response.status_code == 200:
+                        answer = response.json()["choices"][0]["message"]["content"]
+                        report = f"""
 # Ω Research Report
 **Language:** {selected_lang}  
 **Question:** {objective}  
@@ -102,22 +105,31 @@ if st.button("Launch Ω Research", type="primary"):
 {answer}
 
 *Powered by Grok-beta • xAI*
-                    """
-                    st.success("Report Complete!")
-                    st.markdown(report)
-                else:
-                    error_detail = response.text if response.text else "Unknown error"
-                    st.error(f"API Error {response.status_code}: {error_detail}")
-                    if response.status_code == 400:
-                        st.info("400 = Invalid request. Likely param type (e.g., temperature as string). Key is fine—check console logs.")
-                    elif response.status_code == 403:
-                        st.info("403 = No credits. Add $5 at https://console.x.ai/billing.")
-                    elif response.status_code == 429:
-                        st.info("429 = Rate limit. Wait 1 min.")
-            except httpx.TimeoutException:
-                st.error("Timeout — Shorter query or check internet.")
-            except Exception as e:
-                st.error(f"Connection failed: {str(e)}")
+                        """
+                        st.success("Report Complete!")
+                        st.markdown(report)
+                        break  # Success — exit retry loop
+                    else:
+                        error_detail = response.text if response.text else "Unknown error"
+                        st.error(f"API Error {response.status_code} (Attempt {attempt + 1}): {error_detail}")
+                        if response.status_code == 400:
+                            st.info("400 = Invalid request/key. Double-check Secrets (no spaces). Regenerate at console.x.ai.")
+                        elif response.status_code == 403:
+                            st.info("403 = No credits. Add $5 at https://console.x.ai/billing.")
+                        elif response.status_code == 429:
+                            st.info("429 = Rate limit. Waiting 2s...")
+                            time.sleep(2)
+                        if attempt < max_retries - 1:
+                            st.info(f"Retrying in 2s... ({max_retries - attempt - 1} left)")
+                            time.sleep(2)
+                        else:
+                            st.error("Max retries reached. Check key/credits.")
+                except httpx.TimeoutException:
+                    st.error("Timeout — Try shorter query.")
+                    break
+                except Exception as e:
+                    st.error(f"Connection failed: {str(e)}")
+                    break
 
             # === VOICE OUTPUT ===
             if 'report' in locals():
@@ -132,4 +144,4 @@ if st.button("Launch Ω Research", type="primary"):
                     </script>
                     """, height=0)
 
-st.caption("Ω Grok-Omega Global v3.3 • 150+ Languages • Grok-beta • MIT License")
+st.caption("Ω Grok-Omega Global v3.4 • 150+ Languages • Grok-beta • MIT License")
